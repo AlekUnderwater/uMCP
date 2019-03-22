@@ -1,7 +1,7 @@
 # uMCP
 Lightweight communication protocol with guaranteed delivery
 
-uMCP - a free interpretation of the DDCMP protocol, especially designed to
+uMCP - a free view on the DDCMP protocol, especially designed to
 work with small baudrates and channels with high error probability - for example,
 underwater acoustic channel etc.
 uMCP is designed for better usability of uWAVE and RedLINE underwater acoustic
