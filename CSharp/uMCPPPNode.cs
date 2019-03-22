@@ -342,8 +342,9 @@ namespace uMCP
             txFinishedInterval = Convert.ToUInt32(1000 * (fixedTxDelayS + serializedPacket.Length * 8 / baudRateBps));
             IsTxFinishedTimerRunning = true;
 
-            if (packet.PTYPE != uMCPPacketType.DTA) // sending SELECT flag
-                SELECT = false;
+            SELECT = (packet.PTYPE == uMCPPacketType.DTA);
+            //  if (packet.PTYPE != uMCPPacketType.DTA) // sending SELECT flag
+            //     SELECT = false;
 
             if (packet.PTYPE == uMCPPacketType.ACK)
                 ACKSent++;
@@ -424,15 +425,14 @@ namespace uMCP
         private bool IsByteInRangeExclusive(byte st, byte nd, byte val)
         {
             bool result = false;
-            byte idx = st;
-            idx++;
+            byte idx = st;            
             byte _nd = nd;
             _nd--;
             while ((idx != _nd) && (!result))
             {
-                if (idx == val)
-                    result = true;
                 idx++;
+                if (idx == val)
+                    result = true;                
             }
 
             return result;
@@ -487,6 +487,7 @@ namespace uMCP
 
             if (state == uMCPState.RUNNING)
             {
+                IsTimeoutTimerRunning = false;
                 SACK = true;
                 SREP = false;
                 SELECT = true;                
@@ -548,7 +549,10 @@ namespace uMCP
                             
                 if ((dPacket.RCNT == N) || (IsByteInRangeExclusive(A, N, dPacket.RCNT)))
                     AcknowledgeSentItems(dPacket.RCNT);
-                
+
+                if (dPacket.PTYPE == uMCPPacketType.DTA)
+                    IsTimeoutTimerRunning = true;
+
                 SELECT = (dPacket.PTYPE == uMCPPacketType.DTE);
             }
         }
