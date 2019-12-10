@@ -7,7 +7,6 @@
 #include <ff.h>
 #include <ustr.h>
 #include <crc.h>
-#include <nmea.h>
 
 #define CR_CORE_MONIKER             "uMCP\0"
 #define CR_CORE_VERSION             (0x0100)
