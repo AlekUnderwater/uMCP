@@ -4,16 +4,6 @@
 
 DCParams_Struct dcParams;
 
-// nmea buffer from HOST
-unsigned char ni_buffer[UMCP_NBUFFER_SIZE];
-volatile unsigned int ni_cnt = 0;
-volatile bool ni_ready = false;
-volatile bool ni_pkt_start = false;
-
-unsigned char no_buffer[UMCP_NBUFFER_SIZE];
-unsigned int no_cnt = 0;
-bool no_ready = false;
-
 // buffer from HOST
 unsigned char ih_ring[CR_RING_SIZE];
 volatile unsigned int ih_rPos = 0;
@@ -136,188 +126,7 @@ void uMCP_ITimers_Process()
 
 
 // Host communication
-void uMCP_HC_LACK_Write(unsigned char sntID, uMCP_LERR_Enum lErr)
-{
-	Str_WriterInit(no_buffer, &no_cnt, UMCP_NBUFFER_SIZE);
-	Str_WriteByte(no_buffer, &no_cnt, NMEA_SNT_STR);
-	Str_WriteStr(no_buffer, &no_cnt, MCP_PREFIX);
-	Str_WriteByte(no_buffer, &no_cnt, IC_D2H_LACK);
-	Str_WriteByte(no_buffer, &no_cnt, NMEA_PAR_SEP);
-	Str_WriteByte(no_buffer, &no_cnt, sntID);
-	Str_WriteByte(no_buffer, &no_cnt, NMEA_PAR_SEP);
-	Str_WriteByte(no_buffer, &no_cnt, lErr);
-	Str_WriteByte(no_buffer, &no_cnt, NMEA_PAR_SEP);
 
-	Str_WriteByte(no_buffer, &no_cnt, NMEA_CHK_SEP);
-	Str_WriteHexByte(no_buffer, &no_cnt, 0);
-	Str_WriteStr(no_buffer, &no_cnt, NMEA_SNT_PST);
-
-	NMEA_PktCheckSum_Update(no_buffer, no_cnt);
-	no_ready = true;
-}
-
-void uMCP_HC_STAT_Write()
-{
-	Str_WriterInit(no_buffer, &no_cnt, UMCP_NBUFFER_SIZE);
-	Str_WriteByte(no_buffer, &no_cnt, NMEA_SNT_STR);
-	Str_WriteStr(no_buffer, &no_cnt, MCP_PREFIX);
-	Str_WriteByte(no_buffer, &no_cnt, IC_D2H_STAT);
-	Str_WriteByte(no_buffer, &no_cnt, NMEA_PAR_SEP);
-	Str_WriteByte(no_buffer, &no_cnt, (unsigned char)state);
-	Str_WriteByte(no_buffer, &no_cnt, NMEA_PAR_SEP);
-	Str_WriteByte(no_buffer, &no_cnt, select);
-	Str_WriteByte(no_buffer, &no_cnt, NMEA_PAR_SEP);
-
-	Str_WriteByte(no_buffer, &no_cnt, NMEA_CHK_SEP);
-	Str_WriteHexByte(no_buffer, &no_cnt, 0);
-	Str_WriteStr(no_buffer, &no_cnt, NMEA_SNT_PST);
-
-	NMEA_PktCheckSum_Update(no_buffer, no_cnt);
-	no_ready = true;
-}
-
-void uMCP_HC_HDATA_Write(unsigned char sntID, unsigned char* data, unsigned int dSize)
-{
-	Str_WriterInit(oh_buffer, &oh_cnt, UMCP_NBUFFER_SIZE);
-	Str_WriteByte(oh_buffer, &oh_cnt, NMEA_SNT_STR);
-	Str_WriteStr(oh_buffer, &oh_cnt, MCP_PREFIX);
-	Str_WriteByte(oh_buffer, &oh_cnt, sntID);
-	Str_WriteByte(oh_buffer, &oh_cnt, NMEA_PAR_SEP);
-	Str_WriteHexStr(oh_buffer, &oh_cnt, data, dSize);
-	Str_WriteByte(oh_buffer, &oh_cnt, NMEA_CHK_SEP);
-	Str_WriteHexByte(oh_buffer, &oh_cnt, 0);
-	Str_WriteStr(oh_buffer, &oh_cnt, NMEA_SNT_PST);
-	NMEA_PktCheckSum_Update(oh_buffer, oh_cnt);
-	oh_ready = true;
-}
-
-void uMCP_STRT_Parse(unsigned int fromIdx)
-{
-	// $PMCP1,senderID,targetID,selectDefState,selIntMs,toutIntMs,lineBaudrate
-	int i, lastDIdx = fromIdx, pIdx = 0;
-	float val = 0.0f;
-	int sID = -1, tID = -1;
-	bool sdState = false;
-	int selIntMs = -1, toutIntMs = -1, lbRate = -1;
-
-	uMCP_LERR_Enum result = LERR_OK;
-
-	for (i = fromIdx; i <= ni_cnt; i++)
-	{
-		if ((ni_buffer[i] == NMEA_PAR_SEP) || (i == ni_cnt) || (ni_buffer[i] == NMEA_CHK_SEP))
-		{
-			val = Str_ParseFloat(ni_buffer, lastDIdx + 1, i - 1);
-			lastDIdx = i;
-			switch (pIdx)
-			{
-				case 1:
-				{
-					sID = (int)val;
-					break;
-				}
-				case 2:
-				{
-					tID = (int)val;
-					break;
-				}
-				case 3:
-				{
-					sdState = (bool)(int)val;
-					break;
-				}
-				case 4:
-				{
-					selIntMs = (int)val;
-					break;
-				}
-				case 5:
-				{
-					toutIntMs = (bool)(int)val;
-					break;
-				}
-				case 6:
-				{
-					lbRate = (int)val;
-					break;
-				}
-			}
-
-			pIdx++;
-		}
-	}
-
-
-	if ((IS_BYTE(sID)) && (IS_BYTE(tID)) &&
-		(IS_VALID_TINT(selIntMs)) && (IS_VALID_TINT(toutIntMs)) &&
-		(lbRate > 0))
-	{
-		uMCP_STATE_Set(uMCP_STATE_HALTED);
-
-		SID = sID;
-		TID = tID;
-		selectDefaultState = sdState;
-		lineBaudRate = lbRate;
-
-		uMCP_ITimer_Init(uMCP_Timer_SELECT, selIntMs, false);
-		uMCP_ITimer_Init(uMCP_Timer_TMO, toutIntMs, false);
-
-		uMCP_STATE_Set(uMCP_STATE_ISTART);
-		uMCP_CtrlSend(uMCP_PTYPE_STR, 0, 0, true);
-	}
-	else
-	{
-		result = LERR_ARGUMENT_OUT_OF_RANGE;
-	}
-
-	uMCP_HC_LACK_Write(IC_H2D_STRT, result);
-}
-
-void uMCP_OnHostQuery()
-{
-	if (NMEA_PktCheckSum_Check(ni_buffer, ni_cnt))
-	{
-		int ptnPos = NMEA_Ptn_Search(ni_buffer, ni_cnt, (unsigned char*)MCP_PREFIX, MCP_PREFIX_LEN);
-
-		if (ptnPos >= 0)
-		{
-			ptnPos += MCP_PREFIX_LEN;
-			switch(ni_buffer[ptnPos])
-			{
-				// Host interface
-				case IC_H2D_STRT:
-				{
-					uMCP_STRT_Parse(ptnPos);
-					break;
-				}
-				case IC_H2D_SPKT:
-				{
-					int i;
-					for (i = ptnPos + 1; i < ni_cnt; i += 2)
-					{
-						ih_ring[ih_wPos] = Str_ParseHexByte(ni_buffer, i);
-						ih_wPos = (ih_wPos + 1) % CR_RING_SIZE;
-						ih_Cnt++;
-					}
-
-					break;
-				}
-				default:
-				{
-					// unsupported sentence ID
-					uMCP_HC_LACK_Write(ni_buffer[ptnPos], LERR_UNSUPPORTED);
-					break;
-				}
-			}
-		}
-	}
-	else
-	{
-		// Checksum error
-		uMCP_HC_LACK_Write(IC_UNKNOWN, LERR_CHECKSUM);
-	}
-
-	ni_ready = false;
-}
 
 
 // Utils
@@ -589,16 +398,9 @@ void uMCP_OnIncomingPacket()
 				if (tcnt == (unsigned char)(R + 1))
 				{
 					R++;
-
-#ifdef CFG_IS_NMEA
-
-					uMCP_HC_HDATA_Write(IC_D2H_RPKT, ip_datablock, dcnt);
-#else
 					ff_copy_u8(ip_datablock, oh_buffer, dcnt);
 					oh_cnt = dcnt;
 					oh_ready = true;
-#endif
-
 				}
 				sack = true;
 			}
@@ -634,12 +436,6 @@ void uMCP_DC_Output_Process()
 		TAL_DC_Write_Block(CFG_HOST_DC_ID, oh_buffer, oh_cnt);
 		oh_ready = false;
 	}
-	else if ((no_ready) && (!IsDCLock[CFG_HOST_DC_ID]))
-	{
-		TAL_DC_Write_Block(CFG_HOST_DC_ID, no_buffer, no_cnt);
-		no_ready = false;
-	}
-
 	if ((ol_ready) && (!IsDCLock[CFG_LINE_DC_ID]))
 	{
 		TAL_DC_Write_Block(CFG_LINE_DC_ID, ol_buffer, ol_cnt);
@@ -651,39 +447,7 @@ void uMCP_OnNewByte(DCID_Enum chID, unsigned char c)
 {
 	if (chID == CFG_HOST_DC_ID)
 	{
-#ifdef CFG_IS_NMEA
 
-		if (!ni_ready)
-		{
-			if (c == NMEA_SNT_STR)
-			{
-				ni_pkt_start = true;
-				ff_fill_u8(ni_buffer, 0, UMCP_NBUFFER_SIZE);
-				ni_cnt = 0;
-				ni_buffer[ni_cnt++] = c;
-			}
-			else if (ni_pkt_start)
-			{
-				if (c == NMEA_SNT_END)
-				{
-					ni_ready = true;
-					ni_pkt_start = false;
-				}
-				else
-				{
-					if (ni_cnt++ > UMCP_NBUFFER_SIZE)
-					{
-						ni_pkt_start = false;
-					}
-					else
-					{
-						ni_buffer[ni_cnt] = c;
-					}
-				}
-			}
-		}
-
-#else
 		if (ih_Cnt <= CR_RING_SIZE)
 		{
 			ih_ring[ih_wPos] = c;
@@ -691,7 +455,6 @@ void uMCP_OnNewByte(DCID_Enum chID, unsigned char c)
 			ih_Cnt++;
 			ih_TS = TAL_Ticks();
 		}
-#endif
 	}
 	else if (chID == CFG_LINE_DC_ID)
 	{
@@ -863,14 +626,6 @@ void uMCP_PPNode_Run()
 			uMCP_OnIncomingPacket();
 		}
 
-#ifdef CFG_IS_NMEA
-		if (ni_ready)
-			uMCP_OnHostQuery();
-
-		if (state != uMCP_STATE_HALTED)
-			uMCP_Protocol_Perform();
-#else
-
 		// Protocol autostart if buffer is not empty
 		if ((state == uMCP_STATE_HALTED) && (ih_Cnt > 0))
 		{
@@ -881,8 +636,6 @@ void uMCP_PPNode_Run()
 		{
 			uMCP_Protocol_Perform();
 		}
-
-#endif
 
 #ifdef CFG_TAL_IWDG_ENABLED
 		TAL_IWDG_Reload();
