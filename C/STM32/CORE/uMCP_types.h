@@ -43,6 +43,16 @@ typedef enum
 } uMCP_Timer_ID;
 
 
+// uMCP_LERR_Enum
+typedef enum
+{
+	LERR_OK = 0,
+	LERR_ARGUMENT_OUT_OF_RANGE = 1,
+	LERR_CHECKSUM = 2,
+	LERR_UNSUPPORTED = 3,
+	LERR_UNKNOWN
+} uMCP_LERR_Enum;
+
 
 // DCBaudrate_Enum
 typedef enum

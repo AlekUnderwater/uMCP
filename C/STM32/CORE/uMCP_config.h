@@ -6,18 +6,21 @@
 #include <uMCP_types.h>
 
 // Default state of SELECT flag. If it is true, node will regain the flag by timeout anyway
-#define CFG_SELECT_DEFAULT_STATE         (true)
+#define CFG_SELECT_DEFAULT_STATE         (false)
 
 // Default SELECT interval
-#define CFG_SELECT_INTERVAL_MS           (20000)
+#define CFG_SELECT_INTERVAL_MS           (8000)
 
 // Default timeout interval
-#define CFG_TIMEOUT_INTERVAL_MS          (18000)
+#define CFG_TIMEOUT_INTERVAL_MS          (2000)
 
 #define CFG_CR_TICK_FREQUENCY_HZ         (5000.0f)
 
 // Line transmission speed in bits per second (80 for uWAVE and RedLINE modems)
-#define CFG_LINEBAUDRATE                 (80)
+#define CFG_LINEBAUDRATE                 (9600)
+
+// Use NMEA protocol to communicate with host
+//#define CFG_IS_NMEA
 
 // Default data packet size
 #define CFG_DATABLOCK_SIZE               (64)
